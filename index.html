@@ -26,54 +26,12 @@ html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden
 <button id="share" onclick="shareSnapshot()">Share Snapshot</button>
 
 <!-- ─── fragment shader ─── -->
-<script id="frag" type="x-shader/x-fragment">
-precision highp float;
+precision mediump float;
 uniform vec2  u_res;
-uniform vec2  u_center;
-uniform float u_zoom;
-uniform float u_iter;
-uniform float u_t;
-uniform sampler2D u_glow;
-uniform vec3  u_palette0, u_palette1, u_palette2, u_palette3;
-
-float hash(vec2 p){return fract(sin(dot(p,vec2(12.9,78.2)))*43758.);}
-
-vec3 palette(float t){
-    if(t < 0.03 || t > 0.85) return vec3(0.0);        // black anchors
-    float s = t * 3.0;
-
-    /* 0‒1  :  u_palette0  →  u_palette1
-       1‒2  :  u_palette1  →  u_palette2
-       2‒3  :  u_palette2  →  u_palette3            */
-    if (s < 1.0){
-        return mix(u_palette0, u_palette1, s);
-    } else if (s < 2.0){
-        return mix(u_palette1, u_palette2, s-1.0);
-    } else {
-        return mix(u_palette2, u_palette3, s-2.0);
-    }
-}
-
-float mand(vec2 c){
-    vec2 z=c; float i=0.0;
-    for(int n=0;n<900;n++){
-        if(float(n)>=u_iter) break;
-        z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;
-        if(dot(z,z)>4.0){i=float(n);break;}
-    }
-    return i;
-}
-
 void main(){
-    vec2 uv=(gl_FragCoord.xy-u_res*0.5)/u_res.y/u_zoom+u_center;
-    float m=mand(uv)*0.02;
-    vec3 col=palette(m+u_t*0.005);                 // gentle drift
-    vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
-    col=mix(col,col+vec3(1.0,0.8,0.2),g.a*0.6);    // finger‑fire
-    if(hash(gl_FragCoord.xy+u_t)>.985) col+=0.35;  // sparkles
-    gl_FragColor=vec4(col,1.0);
+    vec2 uv = gl_FragCoord.xy/u_res;
+    gl_FragColor = vec4(uv, 0.5+0.5*sin(uv.x*50.0), 1.0);
 }
-</script>
 
 <!-- ─── JavaScript ─── -->
 <script>
