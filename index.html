@@ -38,12 +38,20 @@ uniform vec3  u_palette0, u_palette1, u_palette2, u_palette3;
 
 float hash(vec2 p){return fract(sin(dot(p,vec2(12.9,78.2)))*43758.);}
 
-vec3 palette(float t){                           // black anchors + three blends
-    if(t<0.03||t>0.85) return vec3(0.0);
-    float s=t*3.0;
-    if(s<1.0)       return mix(u_palette0,u_palette1,s);
-    else if(s<2.0)  return mix(u_palette1,u_palette2,s-1.0);
-    else            return mix(u_palette2,u_palette3,s-2.0);
+vec3 palette(float t){
+    if(t < 0.03 || t > 0.85) return vec3(0.0);        // black anchors
+    float s = t * 3.0;
+
+    /* 0‒1  :  u_palette0  →  u_palette1
+       1‒2  :  u_palette1  →  u_palette2
+       2‒3  :  u_palette2  →  u_palette3            */
+    if (s < 1.0){
+        return mix(u_palette0, u_palette1, s);
+    } else if (s < 2.0){
+        return mix(u_palette1, u_palette2, s-1.0);
+    } else {
+        return mix(u_palette2, u_palette3, s-2.0);
+    }
 }
 
 float mand(vec2 c){
