@@ -208,8 +208,9 @@ const hud=document.getElementById('hud'); let fps=0,last=performance.now();
  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,glow); gl.uniform1i(uG,0);
  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 
- fps=.92*fps+.08*(1000/(now-last)); last=now; hud.textContent=`FPS ${fps.toFixed(0)}`;
- request fps = 0.92 * fps + 0.08 * (1000 / (now - last));
+
+ request 
+       fps = 0.92 * fps + 0.08 * (1000 / (now - last));
 last = now;
 hud.textContent = `FPS ${fps.toFixed(0)}`;
 requestAnimationFrame(loop);
