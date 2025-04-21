@@ -52,7 +52,8 @@ vec3 pickPal(int idx){
 }
 
 vec3 palette(float t){
-    if(t<.03||t>.85) return vec3(0.0);
+   if (t < 0.01) return vec3(0.);        // keep tiny nucleus black only
+if (t > 0.98) return vec3(0.);        // fade the *very* large flats
     float s = t*3.0;
     int   i = int(floor(s));            /* 0,1,2 */
     float f = fract(s);
