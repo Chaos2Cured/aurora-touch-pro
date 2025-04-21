@@ -28,18 +28,30 @@ precision highp float;
 uniform vec2  u_res;
 uniform vec2  u_center;
 uniform float u_zoom;
+     uniform float u_iter;
 uniform float u_t;
 uniform sampler2D u_glow;
 
 /* vivid rainbow + blacks */
+/* lavender‑to‑sea‑foam spectrum, with automatic black anchor */
 vec3 palette(float t){
-    if(t < .03) return vec3(0.0);                          /* black nucleus */
-    return vec3(.55 + .45 * cos(6.2831 * (t + vec3(0.00,.34,.68))));
+    if (t < .03)          return vec3(0.0);                        // deep black nucleus
+    if (t > .85)          return vec3(0.0);                        // fade big “flats” to black
+    /* pastel ramp  – lavender → soft‑blue → turquoise → sea‑foam */
+    vec3 stops[4];
+    stops[0]=vec3(0.66,0.55,0.80);  // lavender
+    stops[1]=vec3(0.46,0.58,0.88);  // cornflower
+    stops[2]=vec3(0.30,0.80,0.80);  // turquoise
+    stops[3]=vec3(0.55,0.90,0.75);  // sea‑foam
+    float s = t * 3.0;              // 0‑>3
+    int   i = int(floor(s));
+    float f = fract(s);
+    return mix(stops[i], stops[i+1], smoothstep(0.0,1.0,f));
 }
 
 float mand(vec2 c){
     vec2 z = c; float i = 0.0;
-    for(int n=0;n<200;n++){
+    for(int n=0;n<900;n++){if(float(n) >= u_iter) break;
         z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
         if(dot(z,z) > 4.0){ i = float(n); break; }
     }
@@ -83,6 +95,8 @@ const uR = gl.getUniformLocation(pr, 'u_res'),
       uZ = gl.getUniformLocation(pr, 'u_zoom'),
       uT = gl.getUniformLocation(pr, 'u_t'),
       uG = gl.getUniformLocation(pr, 'u_glow');
+     let baseIter = 300;                              // <‑‑ new default
+const uIter   = gl.getUniformLocation(pr,'u_iter');  // <‑‑ new uniform
 
 /* view state */
 let zoom = 1.0, cx = -0.743643887, cy = 0.1318259;
@@ -103,7 +117,8 @@ function ripple(x,y,strength){
   for(let j=-rad;j<=rad;j++) for(let i=-rad;i<=rad;i++){
       const d2 = i*i + j*j; if(d2 > rad*rad) continue;
       const idx = (((Math.floor(gy+j)+N)%N)*N + (Math.floor(gx+i)+N)%N)*4;
-      const a = strength * (1.0 - Math.sqrt(d2)/rad);
+const pres = (window.event && window.event.pressure) || 0.5; // 0‑1
+const a = pres * strength * (1.0 - sqrt(d2)/rad);
       d[idx]=d[idx+1]=d[idx+2]=255; d[idx+3]=Math.min(255, d[idx+3] + a*255);
   }
 }
@@ -193,8 +208,16 @@ let fps=0,last=performance.now();
   gl.uniform2f(uR,c.width,c.height);
   gl.uniform2f(uC,cx,cy);
   gl.uniform1f(uZ,zoom);
-  gl.uniform1f(uT,t);
+     
+     const Z_MIN = 1e-9;            // ≈ 10⁹× magnification            (tune!)
+if (zoom < Z_MIN) {
+    zoom *= 1.015;             // ease back out  (1.5 % / frame)
+    autopilot = true;          // let smooth drift take over
+}  gl.uniform1f(uT,t);
+     
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex); gl.uniform1i(uG,0);
+     let needIter = Math.max(baseIter, Math.floor(Math.log10(1/zoom))*50);
+gl.uniform1f(uIter, needIter);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   fps = 0.95*fps + 0.05*(1000/(now-last)); last=now;
   hud.textContent=`FPS ${fps.toFixed(0)}`;
