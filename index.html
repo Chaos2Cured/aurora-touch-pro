@@ -19,6 +19,7 @@ html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden
 precision highp float;
 uniform vec2  u_res;
 uniform vec2  u_center;
+     uniform float u_t;
 uniform float u_zoom;
 uniform sampler2D u_glow;
 
@@ -38,7 +39,8 @@ float mand(vec2 c){
 void main(){
     vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y/u_zoom+u_center;
     float m=mand(uv)*.02;
-    vec3 col=palette(m);
+    float phase =u_t * 0.02;
+     vec3 col=palette(m + phase);
     vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
     col=mix(col,col+g.rgb,g.a);                            // tap glow
     gl_FragColor=vec4(col,1);
@@ -62,6 +64,9 @@ const uR=gl.getUniformLocation(pr,'u_res'),
       uC=gl.getUniformLocation(pr,'u_center'),
       uZ=gl.getUniformLocation(pr,'u_zoom'),
       uG=gl.getUniformLocation(pr,'u_glow');
+     
+     const uT=gl.getUniformLocation(pr, 'u_t');
+     gl.uniform1f(uT, now * 0.001);
 
 /* glow texture for tap‑ripples */
 const N=256,d=new Uint8Array(N*N*4),tex=gl.createTexture();
@@ -81,7 +86,14 @@ setInterval(()=>{for(let i=3;i<d.length;i+=4)d[i]=d[i]*0.9|0;
 
 /* view state */
 let zoom=1.0, cx=-0.743643887, cy=0.1318259;
-function resize(){c.width=innerWidth;c.height=innerHeight;gl.viewport(0,0,c.width,c.height);}
+function resize(){
+     const dpr = window.devicePixelRatio || 1;
+c.width  = innerWidth  * dpr;
+c.height = innerHeight * dpr;
+c.style.width  = innerWidth  + "px";   // keep CSS size unchanged
+c.style.height = innerHeight + "px";
+gl.viewport(0,0,c.width,c.height);
+     gl.viewport(0,0,c.width,c.height);}
 addEventListener('resize',resize);resize();
 
 /* pointer controls */
