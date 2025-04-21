@@ -64,9 +64,8 @@ const uR=gl.getUniformLocation(pr,'u_res'),
       uC=gl.getUniformLocation(pr,'u_center'),
       uZ=gl.getUniformLocation(pr,'u_zoom'),
       uG=gl.getUniformLocation(pr,'u_glow');
-     
-     const uT=gl.getUniformLocation(pr, 'u_t');
-     gl.uniform1f(uT, now * 0.001);
+      uT=gl.getUniformLocation(pr, 'u_t');
+  
 
 /* glow texture for tap‑ripples */
 const N=256,d=new Uint8Array(N*N*4),tex=gl.createTexture();
@@ -92,8 +91,7 @@ c.width  = innerWidth  * dpr;
 c.height = innerHeight * dpr;
 c.style.width  = innerWidth  + "px";   // keep CSS size unchanged
 c.style.height = innerHeight + "px";
-gl.viewport(0,0,c.width,c.height);
-     gl.viewport(0,0,c.width,c.height);}
+gl.viewport(0,0,c.width,c.height);}
 addEventListener('resize',resize);resize();
 
 /* pointer controls */
@@ -128,6 +126,7 @@ c.addEventListener('touchmove',e=>{
 let fps=0,last=performance.now();
 (function loop(){
   const now=performance.now();
+     gl.uniform1f(uT, now * 0.001);
   gl.uniform2f(uR,c.width,c.height);
   gl.uniform2f(uC,cx,cy);
   gl.uniform1f(uZ,zoom);
