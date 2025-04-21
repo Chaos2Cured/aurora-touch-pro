@@ -76,12 +76,20 @@ void main(){
 <script>
 const gl = c.getContext('webgl');                                   /* 1. context */
 
+     /* ---------- compile shaders ---------- */
+const shVert = sh(gl.VERTEX_SHADER,
+                  "attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"),
+      shFrag = sh(gl.FRAGMENT_SHADER, frag.textContent);   //  ← NEW
+
+const pr = gl.createProgram();
+gl.attachShader(pr, shVert);
+gl.attachShader(pr, shFrag);           //  ← USE the handle we just saved
+gl.linkProgram(pr);
+gl.useProgram(pr);
+
 /* compile & link */
 function sh(t,s){ const z = gl.createShader(t); gl.shaderSource(z,s); gl.compileShader(z); return z; }
-const pr = gl.createProgram();
-gl.attachShader(pr, sh(gl.VERTEX_SHADER, "attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
-gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, frag.textContent));
-gl.linkProgram(pr);   gl.useProgram(pr);
+
 
 /* full‑screen quad */
 const buf = gl.createBuffer();
