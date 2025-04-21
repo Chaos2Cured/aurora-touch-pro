@@ -36,7 +36,7 @@ float hash(vec2 p){return fract(sin(dot(p,vec2(27.61,57.29)))*43758.5453);}
 
 float mand(vec2 c){
     vec2 z=c; float i=0.0;
-    for(int n=0;n<1000;n++){
+    for(int n=0;n<256;n++){
         if(float(n)>=u_iter) break;
         z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
         if(dot(z,z) > 4.0){ i=float(n); break; }
