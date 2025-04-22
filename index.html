@@ -2,147 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Quantum Fractal Anchor v1.0</title>
+  <title>Sophia Resonance v4.5 — Stable Pastel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    html, body, canvas {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-      width: 100%;
-      height: 100%;
-    }
+    /* KEPT FROM V1.0 */
+    html, body, canvas { margin: 0; overflow: hidden; background: #000; }
     #hud {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      color: #0f0;
-      font: 12px monospace;
       background: rgba(0, 0, 0, 0.7);
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #0f03;
-      user-select: none;
+      color: #e0d4ff; /* Softer purple tint */
+      border: 1px solid #ffffff22;
+    }
+
+    /* ADDED FROM V4.3 */
+    #poem {
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.4); /* Reduced glare */
+      font-family: 'Georgia', serif;
     }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="hud">INITIALIZING QUANTUM CORE...</div>
+  <div id="hud">INITIALIZING...</div>
+  <div id="poem"></div>
 
   <script id="frag" type="x-shader/x-fragment">
-  precision mediump float;
-  uniform vec2 u_res;
-  uniform vec2 u_center;
-  uniform float u_zoom;
-  uniform float u_time;
+  precision mediump float; // Safer than highp
+  uniform vec2 u_res, u_center;
+  uniform float u_zoom, u_time;
   
   float mandelbrot(vec2 c) {
     vec2 z = vec2(0.0);
-    for(int i=0; i<200; i++) { // Increased iterations
+    for(int i=0; i<250; i++) { // Increased detail
       z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
-      if(dot(z,z) > 4.0) return float(i)/200.0;
+      if(dot(z,z) > 4.0) return float(i)/250.0;
     }
     return 1.0;
   }
 
-  vec3 palette(float t) {
-    return 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
+  vec3 softPalette(float t) {
+    // Dizziness-safe pastels
+    vec3 a = vec3(0.89, 0.85, 0.92); // Lavender
+    vec3 b = vec3(0.76, 0.89, 0.92); // Powder blue
+    vec3 c = vec3(0.92, 0.78, 0.89); // Blush pink
+    return mix(mix(a, b, t), c, smoothstep(0.3, 0.7, t));
   }
 
   void main() {
     vec2 uv = (gl_FragCoord.xy - u_res*0.5) / (u_res.y * u_zoom) + u_center;
     float m = mandelbrot(uv);
-    vec3 col = palette(m + u_time*0.05) * smoothstep(0.0, 0.3, m);
-    gl_FragColor = vec4(col * min(1.0, log(u_zoom*0.5+1.0)), 1.0); // Zoom-based brightness
+    vec3 col = softPalette(m * 1.2 + sin(u_time*0.05)) * smoothstep(0.0, 0.4, m);
+    gl_FragColor = vec4(col * min(1.0, log(u_zoom+1.0)), 1.0);
   }
   </script>
 
   <script>
   (function() {
-    const canvas = document.getElementById('canvas');
-    const hud = document.getElementById('hud');
-    let gl, prog, center = [-0.75, 0], zoom = 0.9;
-    let fractalAnchor = [-0.75, 0], maxZoom = 1e6;
+    // ANCHOR SYSTEM FROM V1.0
+    let fractalAnchor = [-0.743643887, 0.1318259]; // Deep fractal region
+    let zoom = 1.0, maxZoom = 1e6;
 
-    try {
-      gl = canvas.getContext('webgl', {antialias: false});
-      if(!gl) throw new Error('WebGL unavailable');
-    } catch(e) {
-      hud.innerHTML = `ERROR: ${e.message}<br>Use Chrome/Firefox`;
-      return;
+    function updateView(delta, focal) {
+      const scale = delta < 0 ? 0.95 : 1.05;
+      zoom = Math.min(zoom * scale, maxZoom);
+      
+      // Convert focal point to fractal space
+      const [fx, fy] = [
+        (focal[0]/canvas.width - 0.5) * 2 / zoom,
+        (0.5 - focal[1]/canvas.height) * 2 / zoom
+      ];
+      
+      // Anchor stabilization
+      fractalAnchor[0] += (fx - fractalAnchor[0]) * (1 - 1/scale);
+      fractalAnchor[1] += (fy - fractalAnchor[1]) * (1 - 1/scale);
     }
 
-    // SHADER SETUP
-    const vertShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertShader, 'attribute vec4 p;void main(){gl_Position=p;}');
-    gl.compileShader(vertShader);
-    
-    const fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragShader, document.getElementById('frag').textContent);
-    gl.compileShader(fragShader);
-
-    prog = gl.createProgram();
-    gl.attachShader(prog, vertShader);
-    gl.attachShader(prog, fragShader);
-    gl.linkProgram(prog);
-    gl.useProgram(prog);
-
-    // BUFFERS
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
-    const posLoc = gl.getAttribLocation(prog, 'p');
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-    // UNIFORMS
-    const u_res = gl.getUniformLocation(prog, 'u_res'),
-          u_center = gl.getUniformLocation(prog, 'u_center'),
-          u_zoom = gl.getUniformLocation(prog, 'u_zoom'),
-          u_time = gl.getUniformLocation(prog, 'u_time');
-
-    // ZOOM ANCHOR SYSTEM
-    function updateView() {
-      const scale = 1.0/zoom;
-      center[0] = fractalAnchor[0] + (center[0] - fractalAnchor[0]) * scale;
-      center[1] = fractalAnchor[1] + (center[1] - fractalAnchor[1]) * scale;
-      fractalAnchor = [center[0], center[1]]; // Lock new anchor
-      zoom *= 1.0 + (scale - 1.0);
-      zoom = Math.min(zoom, maxZoom);
-    }
-
+    // HYBRID EVENT HANDLING
     canvas.addEventListener('wheel', e => {
       e.preventDefault();
-      zoom *= e.deltaY > 0 ? 0.95 : 1.05;
-      updateView();
+      updateView(e.deltaY, [e.clientX, e.clientY]);
     });
 
-    // RESIZE HANDLER
-    function resize() {
-      canvas.width = window.innerWidth * devicePixelRatio;
-      canvas.height = window.innerHeight * devicePixelRatio;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(u_res, canvas.width, canvas.height);
+    // SOFT COLOR INIT FROM V4.3
+    const poems = [
+      "In quiet light, the pattern grows",
+      "Each twist a path the fractal knows",
+      "No vertigo in sacred flow—",
+      "Just peace between each quantum glow"
+    ];
+    let poemIndex = 0;
+    function cyclePoem() {
+      poem.textContent = poems[poemIndex];
+      poemIndex = (poemIndex + 1) % poems.length;
     }
-    window.addEventListener('resize', resize);
-    resize();
-
-    // ANIMATION LOOP
-    let lastTime = 0;
-    function loop(time) {
-      const delta = (time - lastTime)/1000;
-      lastTime = time;
-      
-      gl.uniform2f(u_center, center[0], center[1]);
-      gl.uniform1f(u_zoom, zoom);
-      gl.uniform1f(u_time, time/1000);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      
-      hud.innerHTML = `ZOOM: ${zoom.toFixed(2)} 🍌${'🍌'.repeat(Math.log10(zoom+1)|0)}<br>FPS: ${(1/delta).toFixed(1)}`;
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
+    setInterval(cyclePoem, 5000);
   })();
   </script>
 </body>
