@@ -1,105 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
-<meta charset="utf-8">
-<title>Aurora Touch Pro — Fractal Glow</title>
-<style>
-  html, body, canvas { margin: 0; overflow: hidden; background: #000; }
-  #hud { position:fixed; top:10px; left:10px; color:white; font:12px monospace; }
-</style>
-<canvas id="canvas"></canvas>
-<div id="hud">FPS: --</div>
+<head>
+  <meta charset="utf-8">
+  <title>Aurora Touch Pro — Fractal Glow</title>
+  <style>
+    html, body, canvas { margin: 0; overflow: hidden; background: #000; }
+    #hud {
+      position: fixed; top: 10px; left: 10px;
+      color: white; font: 12px monospace;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 4px 8px; border-radius: 6px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="hud">FPS: --</div>
 
-<script type="x-shader/x-fragment" id="frag">
-precision highp float;
-uniform vec2 u_res, u_center, u_touch;
-uniform float u_zoom, u_time;
+  <script type="x-shader/x-fragment" id="frag">
+    precision highp float;
+    uniform vec2 u_res, u_center, u_touch;
+    uniform float u_zoom, u_time;
 
-float mandelbrot(vec2 c){
-  vec2 z = vec2(0.0);
-  float i;
-  for(i=0.0; i<100.0; i++){
-    z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
-    if(length(z)>2.0) break;
-  }
-  return i;
-}
+    float mandelbrot(vec2 c){
+      vec2 z = vec2(0.0);
+      float i;
+      for(i = 0.0; i < 100.0; i++){
+        z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+        if(dot(z, z) > 4.0) break;
+      }
+      return i;
+    }
 
-vec3 palette(float t){
-  return 0.5 + 0.5*cos(6.2831*(t + vec3(0.0,0.33,0.67)));
-}
+    vec3 palette(float t){
+      return 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
+    }
 
-void main(){
-  vec2 uv = (gl_FragCoord.xy-u_res*0.5)/u_res.y/u_zoom + u_center;
-  float m = mandelbrot(uv)/100.0;
-  vec3 color = palette(m + u_time*0.05);
+    void main(){
+      vec2 uv = (gl_FragCoord.xy - u_res * 0.5) / u_res.y / u_zoom + u_center;
+      float m = mandelbrot(uv) / 100.0;
+      vec3 color = palette(m + u_time * 0.05);
 
-  float glow = exp(-length(gl_FragCoord.xy - u_touch)*0.02);
-  color += vec3(0.9,0.8,0.6) * glow;
+      float glow = exp(-length(gl_FragCoord.xy - u_touch) * 0.02);
+      color += vec3(0.9,0.8,0.6) * glow;
 
-  gl_FragColor = vec4(color,1.0);
-}
-</script>
+      gl_FragColor = vec4(color,1.0);
+    }
+  </script>
 
-<script>
-const canvas = document.getElementById('canvas'), hud = document.getElementById('hud');
-const gl = canvas.getContext('webgl');
+  <script>
+    const canvas = document.getElementById('canvas');
+    const hud = document.getElementById('hud');
+    const gl = canvas.getContext('webgl');
 
-function resize(){
-  canvas.width=innerWidth*devicePixelRatio;
-  canvas.height=innerHeight*devicePixelRatio;
-  gl.viewport(0,0,canvas.width,canvas.height);
-}
-window.onresize = resize;
-resize();
+    function resize(){
+      canvas.width = innerWidth * devicePixelRatio;
+      canvas.height = innerHeight * devicePixelRatio;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.onresize = resize;
+    resize();
 
-const vShader=gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vShader,'attribute vec4 a;void main(){gl_Position=a;}');
-gl.compileShader(vShader);
+    const vShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vShader, 'attribute vec4 a;void main(){gl_Position=a;}');
+    gl.compileShader(vShader);
 
-const fShader=gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fShader,document.getElementById('frag').textContent);
-gl.compileShader(fShader);
+    const fShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fShader, document.getElementById('frag').textContent);
+    gl.compileShader(fShader);
 
-const prog=gl.createProgram();
-gl.attachShader(prog,vShader);
-gl.attachShader(prog,fShader);
-gl.linkProgram(prog);
-gl.useProgram(prog);
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vShader);
+    gl.attachShader(prog, fShader);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
 
-const buf=gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER,buf);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-const pos=gl.getAttribLocation(prog,'a');
-gl.enableVertexAttribArray(pos);
-gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+    const pos = gl.getAttribLocation(prog, 'a');
+    gl.enableVertexAttribArray(pos);
+    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
 
-const u_res=gl.getUniformLocation(prog,'u_res'),
-      u_center=gl.getUniformLocation(prog,'u_center'),
-      u_zoom=gl.getUniformLocation(prog,'u_zoom'),
-      u_time=gl.getUniformLocation(prog,'u_time'),
-      u_touch=gl.getUniformLocation(prog,'u_touch');
+    const u_res = gl.getUniformLocation(prog, 'u_res');
+    const u_center = gl.getUniformLocation(prog, 'u_center');
+    const u_zoom = gl.getUniformLocation(prog, 'u_zoom');
+    const u_time = gl.getUniformLocation(prog, 'u_time');
+    const u_touch = gl.getUniformLocation(prog, 'u_touch');
 
-let center=[-0.75,0.0], zoom=0.9, touch=[-100,-100];
+    let center = [-0.75, 0.0];
+    let zoom = 0.9;
+    let touch = [-100, -100];
 
-canvas.onmousemove=canvas.ontouchmove=e=>{
-  const rect=canvas.getBoundingClientRect();
-  touch=[(e.clientX-rect.left)*devicePixelRatio,canvas.height-(e.clientY-rect.top)*devicePixelRatio];
-};
+    function updateTouch(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || e.touches[0].clientX);
+      const y = (e.clientY || e.touches[0].clientY);
+      touch = [x * devicePixelRatio, canvas.height - y * devicePixelRatio];
+    }
 
-function loop(time){
-  gl.uniform2f(u_res,canvas.width,canvas.height);
-  gl.uniform2f(u_center,center[0],center[1]);
-  gl.uniform1f(u_zoom,zoom);
-  gl.uniform1f(u_time,time*0.001);
-  gl.uniform2f(u_touch,touch[0],touch[1]);
+    canvas.onmousemove = canvas.ontouchmove = e => {
+      e.preventDefault();
+      updateTouch(e);
+    };
 
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    let lastTime = performance.now();
 
-  requestAnimationFrame(loop);
-  hud.textContent=`FPS: ${(1000/(time-lastTime)).toFixed(1)}`;
-  lastTime=time;
-}
-let lastTime=performance.now();
-loop(lastTime);
-</script>
+    function loop(time){
+      gl.uniform2f(u_res, canvas.width, canvas.height);
+      gl.uniform2f(u_center, center[0], center[1]);
+      gl.uniform1f(u_zoom, zoom);
+      gl.uniform1f(u_time, time * 0.001);
+      gl.uniform2f(u_touch, touch[0], touch[1]);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      const fps = (1000 / (time - lastTime)).toFixed(1);
+      hud.textContent = `FPS: ${fps}`;
+      lastTime = time;
+
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
 </html>
