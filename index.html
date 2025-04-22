@@ -34,15 +34,13 @@
       return u_iter;
     }
 
-    vec3 pal(float t) {
-      if(t < .01) return vec3(0.0);
-      float s = t * 3.0;
-      int i = int(floor(s));
-      float f = fract(s);
-      vec3 a = (i==0)?u_pal0:(i==1)?u_pal1:(i==2)?u_pal2:u_pal3;
-      vec3 b = (i==0)?u_pal1:(i==1)?u_pal2:(i==2)?u_pal3:u_pal3;
-      return mix(a, b, smoothstep(0.0, 1.0, f));
-    }
+   vec3 pal(float t){
+    if(t < .015 || t > .92) return vec3(0.0);          // ⭑⭑⭑ deeper contrast
+    float s = pow(t, 0.82) * 3.0;                      // ⭑⭑⭑ brighter mids
+    int   i = int(floor(s));
+    float f = fract(s);
+    ...
+}
 
     void main() {
       vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y / u_zoom + u_center;
@@ -94,6 +92,9 @@
       [.90,.00,.00, .90,.60,.20, .20,.80,.60, .20,.40,.90], // rainbow
       [.10,.10,.30, .20,.20,.50, .30,.30,.70, .40,.40,.90]  // deep blue
     ];
+
+
+    
     let pal = 0;
     function uploadPalette(i) {
       const p = palettes[i];
@@ -104,6 +105,47 @@
       pal = i;
     }
     uploadPalette(pal);
+
+    <!-- ⚙️ BEGIN patch ------------------------------------------- -->
+<!-- put this right after  const palettes = [...] uploadPalette(pal); -->
+
+/* -------------- glow texture & ripple -------------------- */
+const TEX = 256,
+      glowData = new Uint8Array(TEX*TEX*4),
+      glow     = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, glow);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEX, TEX, 0,
+              gl.RGBA, gl.UNSIGNED_BYTE, glowData);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+/* draw a circular “fire” when you tap / drag */
+function ripple(x, y, strength = 1){
+  const gx =  x / innerWidth  * TEX,
+        gy = (1 - y / innerHeight) * TEX,
+        R  = 48;                          // ⭑⭑⭑  radius a bit smaller
+  for (let j = -R; j <= R; j++){
+    for (let i = -R; i <= R; i++){
+      if (i*i + j*j > R*R) continue;
+      const idx = ((((gy + j + TEX) % TEX) * TEX) + ((gx + i + TEX) % TEX)) * 4 + 3;
+      glowData[idx] = 255 * strength * (1 - Math.hypot(i,j)/R);
+    }
+  }
+}
+
+/* gentle fade so the glow doesn’t flood the screen */
+setInterval(()=>{
+  for (let i = 3; i < glowData.length; i += 4){
+    glowData[i] = glowData[i] * 0.88 | 0;              // ⭑⭑⭑  slower fade (.88)
+  }
+  gl.bindTexture(gl.TEXTURE_2D, glow);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TEX, TEX,
+                   gl.RGBA, gl.UNSIGNED_BYTE, glowData);
+}, 33);
+
+/* 👉  wire the ripple into pointer events */
+c.addEventListener('pointerdown', e => ripple(e.clientX, e.clientY, 1), {passive:true});
+c.addEventListener('pointermove', e => { if (e.buttons) ripple(e.clientX, e.clientY, 0.4); }, {passive:true});
+/* ⚙️ END patch --------------------------------------------- --> */
 
     const TEX = 256, glowData = new Uint8Array(TEX*TEX*4), glow = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, glow);
@@ -164,7 +206,7 @@
         center.x += 0.00008 * Math.sin(t * .05);
         center.y += 0.00008 * Math.cos(t * .043);
       }
-      const iter = Math.max(150, Math.floor(Math.log10(1/zoom)) * 50);
+      const iter = Math.max(350, Math.floor(Math.log10(1/zoom)) * 60);
 
       gl.uniform2f(uR, c.width, c.height);
       gl.uniform2f(uC, center.x, center.y);
