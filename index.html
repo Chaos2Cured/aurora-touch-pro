@@ -44,7 +44,7 @@ void main(){
   vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y/u_zoom+u_center;
   float m=mand(uv);
   float sm=m+1.-log2(log(length(uv))+1e-6);
-  vec3 col=palette(sm*.035+u_t*.004);
+  vec3 col=palette(sm*.030 + u_t*.004);
   vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
   col=mix(col,col+vec3(1.,.7,.25),g.a*.6);
   gl_FragColor=vec4(col,1);
@@ -84,7 +84,7 @@ function ripple(x,y){const gx=x/innerWidth*N,gy=(1-y/innerHeight)*N,r=42;
 setInterval(()=>{for(let i=3;i<d.length;i+=4)d[i]=d[i]*.88|0;
  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RGBA,gl.UNSIGNED_BYTE,d);},33);
 /* view */
-let zoom=1,center={x:-0.743643887,y:0.1318259},auto=true;
+let zoom=0.45,center={x:-0.74,y:-.20},auto=true;
 function resize(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;gl.viewport(0,0,c.width,c.height);}
 resize();addEventListener('resize',resize);
 /* pointer */
@@ -102,7 +102,7 @@ const hud=document.getElementById('hud');let fps=0,lastT=performance.now();
 (function loop(){
  const now=performance.now(),t=now/1e3;
  if(auto){zoom/=1.0035;center.x-=0.00008*Math.sin(t*.05);center.y-=0.00008*Math.cos(t*.043);}
- const it=Math.max(350,Math.floor(Math.log10(1/zoom))*70);
+ const iter=Math.max(250, 4.0 * Math.sqrt(1/zoom));
  gl.uniform2f(uR,c.width,c.height);gl.uniform2f(uC,center.x,center.y);gl.uniform1f(uZ,zoom);
  gl.uniform1f(uI,it);gl.uniform1f(uT,t);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(uG,0);
  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
