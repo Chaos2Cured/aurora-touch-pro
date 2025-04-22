@@ -35,7 +35,8 @@ float mand(vec2 c){
 }
 vec3 pick(int i){ return (i==0)?u_pal0:(i==1)?u_pal1:(i==2)?u_pal2:u_pal3; }
 vec3 palette(float t){
-  if(t<.015||t>.90) return vec3(0.0);
+  if (t < .005) return vec3(0.);if (t > .90) return vec3(0.);
+
   float s=pow(t,0.82)*3.0; int i=int(floor(s)); float f=fract(s);
   return mix(pick(i),pick(i+1),smoothstep(0.,1.,f));
 }
@@ -43,7 +44,7 @@ void main(){
   vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y/u_zoom+u_center;
   float m=mand(uv);
   float sm=m+1.-log2(log(length(uv))+1e-6);
-  vec3 col=palette(sm*.015+u_t*.004);
+  vec3 col=palette(sm*.035+u_t*.004);
   vec4 g=texture2D(u_glow,gl_FragCoord.xy/u_res);
   col=mix(col,col+vec3(1.,.7,.25),g.a*.6);
   gl_FragColor=vec4(col,1);
