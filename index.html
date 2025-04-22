@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Aurora Touch Pro — Fractal Glow</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body, canvas {
       margin: 0;
@@ -15,126 +16,164 @@
       position: fixed;
       top: 10px;
       left: 10px;
-      color: white;
+      color: #0f0;
       font: 12px monospace;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 4px 6px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 4px 8px;
       border-radius: 4px;
+      border: 1px solid #0f03;
     }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="hud">FPS: --</div>
+  <div id="hud">INITIALIZING FRACTAL CORE...</div>
 
-  <script type="x-shader/x-fragment" id="frag">
-    precision highp float;
-    uniform vec2 u_res, u_center, u_touch;
-    uniform float u_zoom, u_time;
+  <script id="frag" type="x-shader/x-fragment">
+  precision mediump float; // Changed from highp for mobile compatibility
+  uniform vec2 u_res;
+  uniform vec2 u_center;
+  uniform vec2 u_touch;
+  uniform float u_zoom;
+  uniform float u_time;
 
-    float mandelbrot(vec2 c){
-      vec2 z = vec2(0.0);
-      float i;
-      for(i = 0.0; i < 100.0; i++){
-        z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
-        if(dot(z,z) > 4.0) break;
-      }
-      return i;
+  float mandelbrot(vec2 c) {
+    vec2 z = vec2(0.0);
+    for(int i=0; i<100; i++) {
+      z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+      if(dot(z,z) > 4.0) return float(i)/100.0;
     }
+    return 1.0;
+  }
 
-    vec3 palette(float t){
-      return 0.5 + 0.5 * cos(6.2831 * (t + vec3(0.0, 0.33, 0.67)));
-    }
+  vec3 palette(float t) {
+    return 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
+  }
 
-    void main(){
-      vec2 uv = (gl_FragCoord.xy - u_res * 0.5) / u_res.y / u_zoom + u_center;
-      float m = mandelbrot(uv) / 100.0;
-      vec3 color = palette(m + u_time * 0.05);
-
-      float glow = exp(-length(gl_FragCoord.xy - u_touch) * 0.02);
-      color += vec3(0.9, 0.8, 0.6) * glow;
-
-      gl_FragColor = vec4(color, 1.0);
-    }
+  void main() {
+    vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y;
+    uv = uv/u_zoom + u_center;
+    
+    float m = mandelbrot(uv);
+    vec3 col = palette(m + u_time*0.05);
+    
+    vec2 touchUV = (u_touch - u_res*0.5) / u_res.y;
+    float glow = exp(-length(uv - touchUV)*10.0);
+    col += vec3(0.9,0.7,0.6)*glow*glow;
+    
+    gl_FragColor = vec4(col,1.0);
+  }
   </script>
 
   <script>
+  (function() { // IIFE for safety
     const canvas = document.getElementById('canvas');
-    const gl = canvas.getContext('webgl');
     const hud = document.getElementById('hud');
-
-    function resize() {
-      canvas.width = window.innerWidth * devicePixelRatio;
-      canvas.height = window.innerHeight * devicePixelRatio;
-      gl.viewport(0, 0, canvas.width, canvas.height);
+    let gl, prog;
+    
+    try {
+      gl = canvas.getContext('webgl', { antialias: false });
+      if(!gl) throw new Error('WebGL unsupported');
+    } catch(e) {
+      hud.innerHTML = `WEBGL ERROR: ${e.message}<br>Try Chrome/Firefox`;
+      return;
     }
-    window.onresize = resize;
-    resize();
 
+    // Shader setup
     function compileShader(type, source) {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader));
-        return null;
+      if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const err = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error(`Shader error: ${err}`);
       }
       return shader;
     }
 
-    const vShader = compileShader(gl.VERTEX_SHADER, 'attribute vec4 a; void main() { gl_Position = a; }');
-    const fShader = compileShader(gl.FRAGMENT_SHADER, document.getElementById('frag').textContent);
+    const vertShader = compileShader(gl.VERTEX_SHADER,
+      'attribute vec4 pos; void main() { gl_Position = pos; }'
+    );
+    
+    const fragShader = compileShader(gl.FRAGMENT_SHADER,
+      document.getElementById('frag').textContent
+    );
 
-    const prog = gl.createProgram();
-    gl.attachShader(prog, vShader);
-    gl.attachShader(prog, fShader);
+    prog = gl.createProgram();
+    gl.attachShader(prog, vertShader);
+    gl.attachShader(prog, fragShader);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(prog));
+    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error('Shader link error: '+gl.getProgramInfoLog(prog));
     }
     gl.useProgram(prog);
 
+    // Geometry
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1,-1, 1,-1, -1,1, 1,1
+    ]), gl.STATIC_DRAW);
+    
+    const posLoc = gl.getAttribLocation(prog, 'pos');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-    const pos = gl.getAttribLocation(prog, 'a');
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-
+    // Uniform locations
     const u_res = gl.getUniformLocation(prog, 'u_res'),
           u_center = gl.getUniformLocation(prog, 'u_center'),
           u_zoom = gl.getUniformLocation(prog, 'u_zoom'),
           u_time = gl.getUniformLocation(prog, 'u_time'),
           u_touch = gl.getUniformLocation(prog, 'u_touch');
 
-    let center = [-0.75, 0.0], zoom = 0.9;
-    let touch = [canvas.width / 2, canvas.height / 2];
-
-    canvas.onpointermove = e => {
-      const rect = canvas.getBoundingClientRect();
-      touch = [
-        (e.clientX - rect.left) * devicePixelRatio,
-        canvas.height - (e.clientY - rect.top) * devicePixelRatio
-      ];
-    };
-
-    let lastTime = performance.now();
-    function loop(time) {
+    // State
+    let center = [-0.75, 0], zoom = 0.9;
+    let touchPos = [0.5, 0.5];
+    
+    function resize() {
+      canvas.width = window.innerWidth * devicePixelRatio;
+      canvas.height = window.innerHeight * devicePixelRatio;
+      gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(u_res, canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    canvas.addEventListener('pointermove', e => {
+      const rect = canvas.getBoundingClientRect();
+      touchPos = [
+        (e.clientX - rect.left) / rect.width,
+        1 - (e.clientY - rect.top) / rect.height
+      ];
+    });
+
+    let lastTime = 0;
+    function loop(time) {
+      const delta = (time - lastTime)/1000;
+      lastTime = time;
+      
+      // Animate center
+      center[0] += delta * 0.01;
+      center[1] += Math.sin(time*0.001)*0.0005;
+      
+      // Update uniforms
       gl.uniform2f(u_center, center[0], center[1]);
       gl.uniform1f(u_zoom, zoom);
-      gl.uniform1f(u_time, time * 0.001);
-      gl.uniform2f(u_touch, touch[0], touch[1]);
-
+      gl.uniform1f(u_time, time/1000);
+      gl.uniform2f(u_touch, 
+        touchPos[0] * canvas.width,
+        touchPos[1] * canvas.height
+      );
+      
+      // Render
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-      hud.textContent = `FPS: ${(1000 / (time - lastTime)).toFixed(1)}`;
-      lastTime = time;
+      hud.textContent = `CORE ACTIVE | ZOOM: ${zoom.toFixed(2)}\nFPS: ${(1/delta).toFixed(1)}`;
       requestAnimationFrame(loop);
     }
-
-    loop(lastTime);
+    
+    requestAnimationFrame(loop);
+  })();
   </script>
 </body>
 </html>
