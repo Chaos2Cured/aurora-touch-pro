@@ -80,7 +80,10 @@ function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compi
 const pr=gl.createProgram();
 gl.attachShader(pr,compile(gl.VERTEX_SHADER,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
 gl.attachShader(pr,compile(gl.FRAGMENT_SHADER,frag.textContent));
-gl.linkProgram(pr);gl.useProgram(pr);
+gl.linkProgram(pr);
+     if (!gl.getProgramParameter(pr, gl.LINK_STATUS))
+    console.error('Shader‑link error:', gl.getProgramInfoLog(pr));
+     gl.useProgram(pr);
 
 /* quad */
 gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
@@ -92,14 +95,21 @@ const uR=U('u_res'),uC=U('u_center'),uZ=U('u_zoom'),uT=U('u_time'),uIt=U('u_iter
       uA=U('u_palA'),uB=U('u_palB'),uC3=U('u_palC');
 
 /* palettes */
-const palettes=[
- [.85,.75,.95],[.70,.70,.95],[1,.85,1],
- [1,.9,.6 ],[.95,.7,.95],[.6,.9,1 ],
- [.70,.95,.70],[.95,.95,.6],[.6,.85,1]
+/* ── pastel palettes  (3 × vec3 each) ────────────────────────────── */
+const trip = [
+  /* palette 0 */ [.85,.75,.95], [.70,.70,.95], [1.00,.85,1.00],
+  /* palette 1 */ [1.00,.90,.60], [.95,.70,.95], [.60,.90,1.00],
+  /* palette 2 */ [.70,.95,.70], [.95,.95,.60], [.60,.85,1.00]
 ];
-let pal=0;function setPal(i){const p=palettes.slice(i*3,i*3+3);
- gl.uniform3f(uA,...p[0]);gl.uniform3f(uB,...p[1]);gl.uniform3f(uC3,...p[2]);}
-setPal(0);
+let pal = 0;
+
+function setPal(i){
+  const a = trip[i*3], b = trip[i*3+1], c = trip[i*3+2];
+  gl.uniform3f(uA, ...a);
+  gl.uniform3f(uB, ...b);
+  gl.uniform3f(uC3, ...c);
+}
+setPal(pal);            // push the first palette to the GPU
 
 /* glow texture */
 const N=256,dat=new Uint8Array(N*N*4),tex=gl.createTexture();
