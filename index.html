@@ -35,7 +35,7 @@
     }
 
     vec3 pal(float t) {
-      if(t < .01 || t > .99) return vec3(0.0);
+      if(t < .01) return vec3(0.0);
       float s = t * 3.0;
       int i = int(floor(s));
       float f = fract(s);
@@ -160,7 +160,7 @@
     function render() {
       const now = performance.now(), t = now / 1000;
       if (auto) {
-        zoom *= 0.9965;
+        zoom *= 1.00355;
         center.x += 0.00008 * Math.sin(t * .05);
         center.y += 0.00008 * Math.cos(t * .043);
       }
