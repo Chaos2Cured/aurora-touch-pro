@@ -29,7 +29,7 @@ vec3 nebula(vec2 uv){
 }
 /* pastel tri‑stop palette (cycles through a‑b‑c every 12 s) */
 vec3 pastel(float t){
-     +     t = fract(t);                 // keep t in 0‑1 ➜ never reaches pure black
+    t = fract(t);                 // keep t in 0‑1 ➜ never reaches pure black
     float cyc=mod(u_time/12.,3.);
     vec3 a=(cyc<1.)?u_palA:((cyc<2.)?u_palB:u_palC);
     vec3 b=(cyc<1.)?u_palB:((cyc<2.)?u_palC:u_palA);
