@@ -29,10 +29,11 @@ vec3 nebula(vec2 uv){
 }
 /* pastel tri‑stop palette (cycles through a‑b‑c every 12 s) */
 vec3 pastel(float t){
+     +     t = fract(t);                 // keep t in 0‑1 ➜ never reaches pure black
     float cyc=mod(u_time/12.,3.);
     vec3 a=(cyc<1.)?u_palA:((cyc<2.)?u_palB:u_palC);
     vec3 b=(cyc<1.)?u_palB:((cyc<2.)?u_palC:u_palA);
-    return mix(a,b,clamp(t,0.,1.));
+    return 0.2 + 0.8 * mix(a,b,clamp(t,0.,1.));
 }
 /* simple Mandelbrot (dynamic maxIt) */
 float mand(vec2 c){
