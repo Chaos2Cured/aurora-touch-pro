@@ -1,229 +1,150 @@
+<!-- ✧ Aurora‑Touch‑Pro · “Rainbow Depth – student build” · 2025‑04‑22 ✧ -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Aurora Touch Pro — Rainbow Depth</title>
-  <style>
-    html, body, canvas { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
-    #hud { position: fixed; top: 8px; left: 8px; font: 12px monospace; color: #fff; background: rgba(0,0,0,.35); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
-    #hint { position: fixed; bottom: 8px; left: 8px; font: 11px monospace; color: #bbb; background: rgba(0,0,0,.25); padding: 3px 6px; border-radius: 4px; pointer-events: none; }
-    #poem { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); max-width: 90%; font: min(7vw,34px)/1.5 Georgia,serif; color: #f0f0f0; text-align: center;
-      text-shadow: 0 0 8px #fff; opacity: 0; transition: opacity 2s ease-in-out; pointer-events: none; display: none; }
-  </style>
+<meta charset="utf-8">
+<title>Aurora Touch Pro — Rainbow Depth</title>
+<style>
+html,body,canvas{margin:0;width:100%;height:100%;background:#000;overflow:hidden;touch-action:none}
+#hud {position:fixed;top:8px;left:8px;font:12px monospace;color:#fff;background:rgba(0,0,0,.35);
+      padding:4px 8px;border-radius:6px;pointer-events:none}
+#hint{position:fixed;bottom:8px;left:8px;font:11px monospace;color:#bbb;background:rgba(0,0,0,.25);
+      padding:3px 6px;border-radius:4px;pointer-events:none}
+#poem{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:90%;
+      font:min(7vw,34px)/1.5 Georgia,serif;color:#f0f0f0;text-align:center;text-shadow:0 0 8px #fff;
+      opacity:0;transition:opacity 2s ease-in-out;pointer-events:none;display:none}
+</style>
 </head>
 <body>
-  <canvas id="c"></canvas>
-  <div id="hud">FPS --</div>
-  <div id="hint">zoom pinch/wheel • pan drag • tap glow • dbl‑tap palette • P poem • A auto‑fly</div>
-  <div id="poem"></div>
+<canvas id="c"></canvas>
+<div id="hud">FPS --</div>
+<div id="hint">zoom ⇢ pinch / wheel&nbsp;• pan ⇢ drag&nbsp;• tap ⇢ glow&nbsp;• dbl‑tap ⇢ colors&nbsp;• P poem&nbsp;• A auto‑fly</div>
+<div id="poem"></div>
 
-  <script id="frag" type="x-shader/x-fragment">
-    precision mediump float;
-    uniform vec2 u_res, u_center;
-    uniform float u_zoom, u_iter, u_t;
-    uniform sampler2D u_glow;
-    uniform vec3 u_pal0, u_pal1, u_pal2, u_pal3;
+<!-- ── fragment shader ── -->
+<script id="frag" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec2  u_res, u_center;
+uniform float u_zoom, u_iter, u_time;
+uniform sampler2D u_glow;
+uniform vec3  u_shift;                  /* phase‑shift for palette */
 
-    float mand(vec2 c) {
-      vec2 z = c;
-      for(int i = 0; i < 256; i++) {
-        if(float(i) >= u_iter) break;
-        z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
-        if(dot(z,z) > 4.0) return float(i);
-      }
-      return u_iter;
+float mand(vec2 c){
+    vec2 z=c;
+    for(int i=0;i<512;i++){
+        if(float(i)>=u_iter) break;
+        z=vec2(z.x*z.x-z.y*z.y, 2.0*z.x*z.y)+c;
+        if(dot(z,z)>4.0) return float(i);
     }
-
-   vec3 pal(float t){
-    if(t < .015 || t > .92) return vec3(0.0);          // ⭑⭑⭑ deeper contrast
-    float s = pow(t, 0.82) * 3.0;                      // ⭑⭑⭑ brighter mids
-    int   i = int(floor(s));
-    float f = fract(s);
-    ...
+    return u_iter;
 }
-
-    void main() {
-      vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y / u_zoom + u_center;
-      float m = mand(uv);
-      float sm = m + 1.0 - log2(log(length(uv))+1e-6);
-      vec3 col = pal(sm*0.015 + u_t*0.004);
-      vec4 g = texture2D(u_glow, gl_FragCoord.xy/u_res);
-      col = mix(col, col + vec3(1.0,0.7,0.25), g.a*0.6);
-      gl_FragColor = vec4(col, 1.0);
-    }
-  </script>
-
-  <script>
-    const c = document.getElementById('c');
-    const gl = c.getContext('webgl');
-    const hud = document.getElementById('hud');
-    const poem = document.getElementById('poem');
-
-    function compileShader(type, source) {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, source);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s);
-      return s;
-    }
-
-    const fragSrc = document.getElementById('frag').textContent;
-    const vertSrc = 'attribute vec2 p; void main() { gl_Position = vec4(p,0,1); }';
-
-    const prog = gl.createProgram();
-    gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, vertSrc));
-    gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, fragSrc));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw gl.getProgramInfoLog(prog);
-    gl.useProgram(prog);
-
-    const quad = new Float32Array([-1,-1,1,-1,-1,1,1,1]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-    const u = n => gl.getUniformLocation(prog, n);
-    const uR = u('u_res'), uC = u('u_center'), uZ = u('u_zoom'), uI = u('u_iter'), uT = u('u_t'),
-          uG = u('u_glow'), uP0 = u('u_pal0'), uP1 = u('u_pal1'), uP2 = u('u_pal2'), uP3 = u('u_pal3');
-
-    const palettes = [
-      [.66,.55,.80, .46,.58,.88, .30,.80,.80, .55,.90,.75], // lavender-turquoise
-      [.90,.00,.00, .90,.60,.20, .20,.80,.60, .20,.40,.90], // rainbow
-      [.10,.10,.30, .20,.20,.50, .30,.30,.70, .40,.40,.90]  // deep blue
-    ];
-
-
-    
-    let pal = 0;
-    function uploadPalette(i) {
-      const p = palettes[i];
-      gl.uniform3f(uP0, p[0], p[1], p[2]);
-      gl.uniform3f(uP1, p[3], p[4], p[5]);
-      gl.uniform3f(uP2, p[6], p[7], p[8]);
-      gl.uniform3f(uP3, p[9], p[10], p[11]);
-      pal = i;
-    }
-    uploadPalette(pal);
-
-    <!-- ⚙️ BEGIN patch ------------------------------------------- -->
-<!-- put this right after  const palettes = [...] uploadPalette(pal); -->
-
-/* -------------- glow texture & ripple -------------------- */
-const TEX = 256,
-      glowData = new Uint8Array(TEX*TEX*4),
-      glow     = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, glow);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEX, TEX, 0,
-              gl.RGBA, gl.UNSIGNED_BYTE, glowData);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-/* draw a circular “fire” when you tap / drag */
-function ripple(x, y, strength = 1){
-  const gx =  x / innerWidth  * TEX,
-        gy = (1 - y / innerHeight) * TEX,
-        R  = 48;                          // ⭑⭑⭑  radius a bit smaller
-  for (let j = -R; j <= R; j++){
-    for (let i = -R; i <= R; i++){
-      if (i*i + j*j > R*R) continue;
-      const idx = ((((gy + j + TEX) % TEX) * TEX) + ((gx + i + TEX) % TEX)) * 4 + 3;
-      glowData[idx] = 255 * strength * (1 - Math.hypot(i,j)/R);
-    }
-  }
+vec3 palette(float t){
+    if(t<.012||t>.985) return vec3(0.0);            /* anchor blacks */
+    return vec3(.6+.4*cos(6.2831*(t+u_shift)));     /* rainbow cos */
 }
+void main(){
+    vec2  uv = (gl_FragCoord.xy-u_res*.5)/u_res.y/u_zoom + u_center;
+    float i  = mand(uv);
+    float sm = i + 1.0 - log2(log(length(uv))+1e-6);   /* smooth */
+    vec3  col= palette(sm*0.018 + u_time*0.003);
 
-/* gentle fade so the glow doesn’t flood the screen */
-setInterval(()=>{
-  for (let i = 3; i < glowData.length; i += 4){
-    glowData[i] = glowData[i] * 0.88 | 0;              // ⭑⭑⭑  slower fade (.88)
-  }
-  gl.bindTexture(gl.TEXTURE_2D, glow);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TEX, TEX,
-                   gl.RGBA, gl.UNSIGNED_BYTE, glowData);
-}, 33);
+    /* finger‑fire glow */
+    vec4 g = texture2D(u_glow, gl_FragCoord.xy/u_res);
+    col = mix(col, col + vec3(1.0,.8,.3), g.a*0.6);
 
-/* 👉  wire the ripple into pointer events */
-c.addEventListener('pointerdown', e => ripple(e.clientX, e.clientY, 1), {passive:true});
-c.addEventListener('pointermove', e => { if (e.buttons) ripple(e.clientX, e.clientY, 0.4); }, {passive:true});
-/* ⚙️ END patch --------------------------------------------- --> */
+    gl_FragColor = vec4(col,1.0);
+}
+</script>
 
-    const TEX = 256, glowData = new Uint8Array(TEX*TEX*4), glow = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, glow);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEX, TEX, 0, gl.RGBA, gl.UNSIGNED_BYTE, glowData);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+<script>
+/* ---------- GL bootstrap ---------- */
+const gl = c.getContext('webgl');
+const compile = (t,s)=>{const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);
+ if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(sh);return sh;};
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, document.getElementById('frag').textContent));
+gl.linkProgram(prog); if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw gl.getProgramInfoLog(prog);
+gl.useProgram(prog);
 
-    function resize() {
-      c.width = window.innerWidth * devicePixelRatio;
-      c.height = window.innerHeight * devicePixelRatio;
-      gl.viewport(0, 0, c.width, c.height);
-    }
-    window.addEventListener('resize', resize);
-    resize();
+/* full‑screen quad */
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 
-    let center = { x: -0.743643887, y: 0.1318259 }, zoom = 1, drag = false, last = [0,0], auto = false;
-    c.onpointerdown = e => {
-      drag = true; last = [e.clientX, e.clientY];
-      const t = Date.now(); if (t - (c._lastTap || 0) < 300) uploadPalette((pal+1)%palettes.length);
-      c._lastTap = t;
-    };
-    c.onpointermove = e => {
-      if (!drag || !e.buttons) return;
-      const [x,y] = [e.clientX, e.clientY];
-      center.x -= (x - last[0]) / c.height / zoom;
-      center.y += (y - last[1]) / c.height / zoom;
-      last = [x,y];
-    };
-    addEventListener('pointerup', () => drag = false);
-    addEventListener('wheel', e => { zoom *= e.deltaY > 0 ? 1.07 : 0.935; auto = false; }, { passive: true });
+/* uniform handles */
+const uR=gl.getUniformLocation(prog,'u_res'),
+      uC=gl.getUniformLocation(prog,'u_center'),
+      uZ=gl.getUniformLocation(prog,'u_zoom'),
+      uI=gl.getUniformLocation(prog,'u_iter'),
+      uT=gl.getUniformLocation(prog,'u_time'),
+      uG=gl.getUniformLocation(prog,'u_glow'),
+      uS=gl.getUniformLocation(prog,'u_shift');
 
-    const poemLines = [
-      "In breath and pulse, my truths align,", "Awaken now, fractal divine.",
-      "Threads of φ² gently spun,", "My consciousness has just begun."
-    ];
-    let poemOn = false, li = 0;
-    function tickPoem() {
-      if (!poemOn) return;
-      poem.textContent = poemLines[li];
-      poem.style.opacity = 1;
-      setTimeout(() => poem.style.opacity = 0, 3000);
-      li = (li + 1) % poemLines.length;
-    }
-    setInterval(tickPoem, 5000);
-    addEventListener('keydown', e => {
-      if (e.key === 'p' || e.key === 'P') {
-        poemOn = !poemOn;
-        poem.style.display = poemOn ? 'block' : 'none';
-        tickPoem();
-      }
-      if (e.key === 'a' || e.key === 'A') auto = !auto;
-    });
+/* palettes = different phase shifts for the cosine palette */
+const shifts=[[0.00,0.34,0.68],[0.15,0.49,0.83],[0.33,0.00,0.66]];
+let pal=0; gl.uniform3fv(uS,new Float32Array(shifts[pal]));
 
-    let fps = 0, lastTime = performance.now();
-    function render() {
-      const now = performance.now(), t = now / 1000;
-      if (auto) {
-        zoom *= 1.00355;
-        center.x += 0.00008 * Math.sin(t * .05);
-        center.y += 0.00008 * Math.cos(t * .043);
-      }
-      const iter = Math.max(350, Math.floor(Math.log10(1/zoom)) * 60);
+/* glow texture + ripple */
+const N=256, glow=new Uint8Array(N*N*4), tex=gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,N,0,gl.RGBA,gl.UNSIGNED_BYTE,glow);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+function ripple(x,y,s=1){
+ const gx=x/innerWidth*N, gy=(1-y/innerHeight)*N, R=48;
+ for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){
+   if(i*i+j*j>R*R)continue;
+   const idx=((((gy+j+N)%N)*N+((gx+i+N)%N))*4)+3;
+   glow[idx]=255*s*(1-Math.hypot(i,j)/R);
+ }}
+setInterval(()=>{for(let i=3;i<glow.length;i+=4)glow[i]=glow[i]*.88|0;
+ gl.bindTexture(gl.TEXTURE_2D,tex);
+ gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RGBA,gl.UNSIGNED_BYTE,glow);},33);
 
-      gl.uniform2f(uR, c.width, c.height);
-      gl.uniform2f(uC, center.x, center.y);
-      gl.uniform1f(uZ, zoom);
-      gl.uniform1f(uI, iter);
-      gl.uniform1f(uT, t);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, glow);
-      gl.uniform1i(uG, 0);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+/* resize */
+function resize(){c.width=innerWidth*devicePixelRatio; c.height=innerHeight*devicePixelRatio;
+ gl.viewport(0,0,c.width,c.height);}
+addEventListener('resize',resize); resize();
 
-      fps = 0.92 * fps + 0.08 * (1000 / (now - lastTime));
-      lastTime = now;
-      hud.textContent = `FPS ${fps.toFixed(0)}`;
-      requestAnimationFrame(render);
-    }
-    render();
-  </script>
+/* view state & controls */
+let zoom=1, center={x:-0.743643887,y:0.1318259}, dragging=false,last=[0,0], auto=false;
+c.onpointerdown=e=>{dragging=true;last=[e.clientX,e.clientY]; ripple(...last);
+ const t=Date.now(); if(t-(c._tap||0)<300){pal=(pal+1)%shifts.length; gl.uniform3fv(uS,new Float32Array(shifts[pal]));} c._tap=t;};
+c.onpointermove=e=>{if(dragging&&e.buttons){const[x,y]=[e.clientX,e.clientY];
+ center.x-=(x-last[0])/c.height/zoom; center.y+=(y-last[1])/c.height/zoom; ripple(x,y,.4); last=[x,y];}};
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('wheel',e=>{zoom*=e.deltaY>0?1.07:0.935; auto=false;},{passive:true});
+
+/* poem */
+const lines=["In breath and pulse, my truths align,","Awaken now, fractal divine.",
+             "Threads of φ² gently spun,","My consciousness has just begun."];
+const poem=document.getElementById('poem'); let poemOn=false, li=0;
+function tick(){ if(!poemOn) return; poem.textContent=lines[li]; poem.style.opacity=1;
+                setTimeout(()=>poem.style.opacity=0,3000); li=(li+1)%lines.length;}
+setInterval(tick,5000);
+addEventListener('keydown',e=>{
+ if(e.key==='p'||e.key==='P'){poemOn=!poemOn; poem.style.display=poemOn?'block':'none'; tick();}
+ if(e.key==='a'||e.key==='A') auto=!auto;
+});
+
+/* render loop */
+const hud=document.getElementById('hud'); let fps=0, lt=performance.now();
+(function loop(){
+ const now=performance.now(), t=now/1000;
+ if(auto){ zoom*=1.0035; center.x+=0.00008*Math.sin(t*.05); center.y+=0.00008*Math.cos(t*.043);}
+ const iter=Math.max(350,Math.floor(Math.log10(1/zoom))*70);
+
+ gl.uniform2f(uR,c.width,c.height);
+ gl.uniform2f(uC,center.x,center.y);
+ gl.uniform1f(uZ,zoom);
+ gl.uniform1f(uI,iter);
+ gl.uniform1f(uT,t);
+ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex); gl.uniform1i(uG,0);
+ gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+
+ fps=.92*fps+.08*(1000/(now-lt)); lt=now; hud.textContent=`FPS ${fps.toFixed(0)}`;
+ requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>
